@@ -19,14 +19,16 @@ static VdpVideoMixer                      video_mixer;
 static float                              min_luma;
 static float                              max_luma;
 static int                                lumakey;
+static int                                bicubic;
 static uint32_t                           vid_width, vid_height;
+static float                              sharpen;
 static VdpChromaType                      vdp_chroma_type;
 static VdpDevice                          vdp_device;
 static VdpYCbCrFormat                     vdp_pixel_format;
 
 
 static VdpGetProcAddress                 *vdp_get_proc_address;
-static int                                colorspace;
+static int                                colorspace; 
 
 static VdpPresentationQueueTarget         vdp_target;
 static VdpPresentationQueue               vdp_queue;
@@ -92,7 +94,7 @@ void init_x() {
 	black=BlackPixel(dis,screen),
 	white=WhitePixel(dis, screen);
         win=XCreateSimpleWindow(dis,DefaultRootWindow(dis),0,0,	
-                300, 300, 5, black, white);
+                610, 610, 5, black, white);
         XSetStandardProperties(dis,win,"Howdy","Hi",None,NULL,0,NULL);
         XSelectInput(dis, win, ExposureMask|ButtonPressMask|KeyPressMask);
         gc=XCreateGC(dis, win, 0,NULL);        
@@ -234,6 +236,8 @@ static int create_vdp_mixer(VdpChromaType vdp_chroma_type)
    
     VdpVideoMixerFeature features[MAX_NUM_FEATURES];        
     VdpBool feature_enables[MAX_NUM_FEATURES];
+    static const VdpVideoMixerAttribute sharpen_attrib[] = {VDP_VIDEO_MIXER_ATTRIBUTE_SHARPNESS_LEVEL};
+    const void * const sharpen_value[] = {&sharpen};
     static const VdpVideoMixerAttribute lumakey_attrib[] = {VDP_VIDEO_MIXER_ATTRIBUTE_LUMA_KEY_MIN_LUMA, VDP_VIDEO_MIXER_ATTRIBUTE_LUMA_KEY_MAX_LUMA};
     const void * const lumakey_value[] = {&min_luma, &max_luma};
     static const VdpVideoMixerParameter parameters[VDP_NUM_MIXER_PARAMETER] = {
@@ -248,11 +252,16 @@ static int create_vdp_mixer(VdpChromaType vdp_chroma_type)
     };
     if (lumakey)
         features[feature_count++] = VDP_VIDEO_MIXER_FEATURE_LUMA_KEY;
+    if (sharpen)
+        features[feature_count++] = VDP_VIDEO_MIXER_FEATURE_SHARPNESS;
+    if (bicubic)
+        features[feature_count++] = VDP_VIDEO_MIXER_FEATURE_HIGH_QUALITY_SCALING_L1;
 
     vdp_st = vdp_video_mixer_create(vdp_device, feature_count, features,
                                     VDP_NUM_MIXER_PARAMETER,
                                     parameters, parameter_values,
                                     &video_mixer);
+
 
     for (i = 0; i < feature_count; i++)
         feature_enables[i] = VDP_TRUE;
@@ -260,7 +269,9 @@ static int create_vdp_mixer(VdpChromaType vdp_chroma_type)
         vdp_video_mixer_set_feature_enables(video_mixer, feature_count, features, feature_enables);
     if (lumakey)
         vdp_video_mixer_set_attribute_values(video_mixer, 2, lumakey_attrib, lumakey_value);
-    update_csc_matrix();
+    if (sharpen)
+        vdp_video_mixer_set_attribute_values(video_mixer, 1, sharpen_attrib, sharpen_value);
+  update_csc_matrix();
     return 0;
 
 }
@@ -281,7 +292,7 @@ int create_output_surface(){
     VdpStatus vdp_st;
 
     vdp_st = vdp_output_surface_create(vdp_device, VDP_RGBA_FORMAT_B8G8R8A8,
-                                           vid_width, vid_height,
+                                           vid_width*1.9, vid_height*1.9,
                                            &output_surface);
     if (vdp_st == VDP_STATUS_OK) return 1;
     else return 0;
@@ -298,7 +309,7 @@ int put_bits() {
     for(i = 0; i < 1; i++) data[i] = (uint32_t *)calloc(vid_width*vid_height, sizeof(uint32_t *));
     
     for(i = 0; i < 1; i++) {
-        for(j = 0; j < vid_width*vid_height; j++) data[i][j] = ((double)j/(vid_width*vid_height))*255*65536;
+        for(j = 0; j < vid_width*vid_height; j++) scanf("%ld",&data[i][j]);
     }
 
     vdp_st = vdp_video_surface_put_bits_y_cb_cr(video_surface, vdp_pixel_format,
@@ -338,15 +349,17 @@ int get_bits() {
 
 int main(){
     vdp_chroma_type = VDP_CHROMA_TYPE_420;
-    vid_width = 50;
-    vid_height = 50;
+    vid_width = 300;
+    vid_height = 300;
     char text[255];
     KeySym key;
     XEvent event;
     uint64_t tim = 0;
     colorspace =1;  
-    lumakey = 1;
-    min_luma = 0.200000;
+    sharpen = 0;
+    lumakey = 0;
+    bicubic = 1;
+    min_luma = 0.600000;
     max_luma = 0.900000;
     VdpStatus vdp_st;
     int field = VDP_VIDEO_MIXER_PICTURE_STRUCTURE_FRAME;
@@ -375,7 +388,7 @@ int main(){
     
 
     get_bits();
-    while(0) 
+    while(1) 
 
     {
            vdp_st = vdp_presentation_queue_display(vdp_queue,
