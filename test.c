@@ -94,7 +94,7 @@ void init_x() {
 	black=BlackPixel(dis,screen),
 	white=WhitePixel(dis, screen);
         win=XCreateSimpleWindow(dis,DefaultRootWindow(dis),0,0,	
-                610, 610, 5, black, white);
+                768, 1366/2, 5, black, white);
         XSetStandardProperties(dis,win,"Howdy","Hi",None,NULL,0,NULL);
         XSelectInput(dis, win, ExposureMask|ButtonPressMask|KeyPressMask);
         gc=XCreateGC(dis, win, 0,NULL);        
@@ -255,7 +255,7 @@ static int create_vdp_mixer(VdpChromaType vdp_chroma_type)
     if (sharpen)
         features[feature_count++] = VDP_VIDEO_MIXER_FEATURE_SHARPNESS;
     if (bicubic)
-        features[feature_count++] = VDP_VIDEO_MIXER_FEATURE_HIGH_QUALITY_SCALING_L1;
+        features[feature_count++] = VDP_VIDEO_MIXER_FEATURE_HIGH_QUALITY_SCALING_L2;
 
     vdp_st = vdp_video_mixer_create(vdp_device, feature_count, features,
                                     VDP_NUM_MIXER_PARAMETER,
@@ -292,7 +292,7 @@ int create_output_surface(){
     VdpStatus vdp_st;
 
     vdp_st = vdp_output_surface_create(vdp_device, VDP_RGBA_FORMAT_B8G8R8A8,
-                                           vid_width*1.9, vid_height*1.9,
+                                           1366/2, 768,
                                            &output_surface);
     if (vdp_st == VDP_STATUS_OK) return 1;
     else return 0;
@@ -336,19 +336,19 @@ int get_bits() {
                                                 (void * const*)data,
                                                  a);
  
-    for(i = 0; i < vid_height; i++){
+/*    for(i = 0; i < vid_height; i++){
         for(j = 0; j < vid_width; j++){
-            printf("%ld " ,data[0][i*vid_width+j]/16777216);
+            printf("%ld " ,(data[0][i*vid_width+j])%256);
         }
         printf("\n");
     }
-
+*/
     return 0; 
 
 }
 
 int main(){
-    vdp_chroma_type = VDP_CHROMA_TYPE_420;
+    vdp_chroma_type = VDP_CHROMA_TYPE_422;
     vid_width = 300;
     vid_height = 300;
     char text[255];
@@ -388,14 +388,21 @@ int main(){
     
 
     get_bits();
-    while(1) 
-
+    int i = 500;
+    while(i) 
     {
            vdp_st = vdp_presentation_queue_display(vdp_queue,
                                                   output_surface, 
-                                                  0, 0,
+                                                  1366/2, 768,
                                                   0);
+           i--;
     }
 
+    while(1){
+       XNextEvent(dis, &event);
+
+       if(event.type == KeyPress)
+           close_x();
+    }
     return 0;
 }
