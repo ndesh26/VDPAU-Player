@@ -28,7 +28,7 @@ static VdpYCbCrFormat                     vdp_pixel_format;
 
 
 static VdpGetProcAddress                 *vdp_get_proc_address;
-static int                                colorspace; 
+static int                                colorspace;
 
 static VdpPresentationQueueTarget         vdp_target;
 static VdpPresentationQueue               vdp_queue;
@@ -87,31 +87,37 @@ static VdpPreemptionCallbackRegister             *vdp_preemption_callback_regist
 
 
 void init_x() {
-	unsigned long black,white;
+    unsigned long black,white;
 
-	dis=XOpenDisplay((char *)0);
-   	screen=DefaultScreen(dis);
-	black=BlackPixel(dis,screen),
-	white=WhitePixel(dis, screen);
-        win=XCreateSimpleWindow(dis,DefaultRootWindow(dis),0,0,	
-                768, 1366/2, 5, black, white);
-        XSetStandardProperties(dis,win,"Howdy","Hi",None,NULL,0,NULL);
-        XSelectInput(dis, win, ExposureMask|ButtonPressMask|KeyPressMask);
-        gc=XCreateGC(dis, win, 0,NULL);        
-        XSetBackground(dis,gc,white);
-        XSetBackground(dis,gc,black);
-        XClearWindow(dis, win);
+    dis = XOpenDisplay((char *)0);
+    screen = DefaultScreen(dis);
+    black = BlackPixel(dis,screen),
+    white = WhitePixel(dis, screen);
+    win = XCreateSimpleWindow(dis,DefaultRootWindow(dis),0,0,
+                   768, 1366/2, 5, black, white);
+    XSetStandardProperties(dis,win,"Howdy","Hi",None,NULL,0,NULL);
+    XSelectInput(dis, win, ExposureMask|ButtonPressMask|KeyPressMask);
+    gc = XCreateGC(dis, win, 0,NULL);
+    XSetBackground(dis,gc,white);
+    XSetBackground(dis,gc,black);
+    XClearWindow(dis, win);
 };
 
 void close_x() {
-	XFreeGC(dis, gc);
-	XDestroyWindow(dis,win);
-	XCloseDisplay(dis);	
-	exit(1);				
+    vdp_video_surface_destroy(video_surface);
+    vdp_output_surface_destroy(output_surface);
+    vdp_video_mixer_destroy(video_mixer);
+    vdp_presentation_queue_destroy(vdp_queue);
+    vdp_presentation_queue_target_destroy(vdp_target);
+    vdp_device_destroy(vdp_device);
+    XFreeGC(dis, gc);
+    XDestroyWindow(dis,win);
+    XCloseDisplay(dis);
+    exit(0);
 };
 
 int init_vdpau() {
-    
+
     VdpStatus vdp_st;
 
     struct vdp_function {
@@ -166,7 +172,7 @@ int init_vdpau() {
     };
     vdp_st = vdp_device_create_x11(dis, screen,
                                &vdp_device, &vdp_get_proc_address);
-    
+
     if (vdp_st != VDP_STATUS_OK) {
         return -1;
     }
@@ -200,7 +206,7 @@ int init_vdpau_queue()
 
     vdp_st = vdp_presentation_queue_set_background_color(vdp_queue, &vdp_bg);
     if(vdp_st != VDP_STATUS_OK) return -1;
- 
+
     return 0;
 }
 
@@ -219,7 +225,7 @@ static int update_csc_matrix(void)
 
 
     vdp_st = vdp_generate_csc_matrix(&procamp, vdp_colors[csp], &matrix);
-    
+
     vdp_st = vdp_video_mixer_set_attribute_values(video_mixer, 1, attributes,
                                                   attribute_values);
     return 0;
@@ -233,8 +239,8 @@ static int create_vdp_mixer(VdpChromaType vdp_chroma_type)
     int i;
     VdpStatus vdp_st;
     int feature_count = 0;
-   
-    VdpVideoMixerFeature features[MAX_NUM_FEATURES];        
+
+    VdpVideoMixerFeature features[MAX_NUM_FEATURES];
     VdpBool feature_enables[MAX_NUM_FEATURES];
     static const VdpVideoMixerAttribute sharpen_attrib[] = {VDP_VIDEO_MIXER_ATTRIBUTE_SHARPNESS_LEVEL};
     const void * const sharpen_value[] = {&sharpen};
@@ -277,7 +283,7 @@ static int create_vdp_mixer(VdpChromaType vdp_chroma_type)
 }
 
 int create_video_surface(){
-     
+
     VdpStatus vdp_st;
 
     vdp_st = vdp_video_surface_create(vdp_device, vdp_chroma_type,
@@ -288,11 +294,11 @@ int create_video_surface(){
 }
 
 int create_output_surface(){
-     
+
     VdpStatus vdp_st;
 
     vdp_st = vdp_output_surface_create(vdp_device, VDP_RGBA_FORMAT_B8G8R8A8,
-                                           1366/2, 768,
+                                           vid_width, vid_height,
                                            &output_surface);
     if (vdp_st == VDP_STATUS_OK) return 1;
     else return 0;
@@ -303,11 +309,11 @@ int put_bits() {
     int i,j;
     const uint32_t a[1] = {vid_width*4};
     VdpStatus vdp_st;
-    
+
     data = (uint32_t * * )calloc(1, sizeof(uint32_t *));
-    
+
     for(i = 0; i < 1; i++) data[i] = (uint32_t *)calloc(vid_width*vid_height, sizeof(uint32_t *));
-    
+
     for(i = 0; i < 1; i++) {
         for(j = 0; j < vid_width*vid_height; j++) scanf("%ld",&data[i][j]);
     }
@@ -318,7 +324,7 @@ int put_bits() {
     for (i = 0; i < 1; i++) {
         free(data[i]);
     }
-    return 0; 
+    return 0;
 
 }
 
@@ -327,23 +333,23 @@ int get_bits() {
     int i,j;
     const uint32_t a[1] = {vid_width*4};
     VdpStatus vdp_st;
-    
+
     data = (uint32_t * * )calloc(1, sizeof(uint32_t *));
-    
+
     for(i = 0; i < 1; i++) data[i] = (uint32_t *)calloc(vid_width*vid_height, sizeof(uint32_t *));
-    
+
     vdp_st = vdp_output_surface_get_bits_native(output_surface,NULL,
                                                 (void * const*)data,
                                                  a);
- 
-/*    for(i = 0; i < vid_height; i++){
+
+    for(i = 0; i < vid_height; i++){
         for(j = 0; j < vid_width; j++){
             printf("%ld " ,(data[0][i*vid_width+j])%256);
         }
         printf("\n");
     }
-*/
-    return 0; 
+
+    return 0;
 
 }
 
@@ -355,7 +361,7 @@ int main(){
     KeySym key;
     XEvent event;
     uint64_t tim = 0;
-    colorspace =1;  
+    colorspace =1;
     sharpen = 0;
     lumakey = 0;
     bicubic = 1;
@@ -373,36 +379,31 @@ int main(){
 
     init_x();
     init_vdpau();
-    init_vdpau_queue();    
+    init_vdpau_queue();
     create_vdp_mixer(vdp_chroma_type);
     create_video_surface();
     create_output_surface();
     put_bits();
     vdp_st = vdp_video_mixer_render(video_mixer, VDP_INVALID_HANDLE, 0,
-                                        field, 0, (VdpVideoSurface*)VDP_INVALID_HANDLE,
-                                        video_surface,
-                                        0, (VdpVideoSurface*)VDP_INVALID_HANDLE,
-                                        NULL,
-                                        output_surface,
-                                        NULL, NULL, 0, NULL);
-    
+                                    field, 0, (VdpVideoSurface*)VDP_INVALID_HANDLE,
+                                    video_surface,
+                                    0, (VdpVideoSurface*)VDP_INVALID_HANDLE,
+                                    NULL,
+                                    output_surface,
+                                    NULL, NULL, 0, NULL);
 
-    get_bits();
-    int i = 500;
-    while(i) 
-    {
-           vdp_st = vdp_presentation_queue_display(vdp_queue,
-                                                  output_surface, 
-                                                  1366/2, 768,
-                                                  0);
-           i--;
-    }
 
-    while(1){
+    vdp_st = vdp_presentation_queue_display(vdp_queue,
+                                            output_surface,
+                                            vid_width, vid_height,
+                                            0);
+
+    while(1) {
        XNextEvent(dis, &event);
 
        if(event.type == KeyPress)
            close_x();
     }
+
     return 0;
 }
